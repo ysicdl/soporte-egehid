@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>EGEHID - Registro de Soporte Técnico</title>
+    <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --blue-egehid: #0056D2; --blue-dark: #003BB3; --green-accent: #00E676; --bg: #F4F7FA; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg); margin: 0; padding: 20px; color: #1e293b; }
+        .card { max-width: 700px; margin: 0 auto; background: white; padding: 32px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border-top: 6px solid var(--blue-egehid); }
+        .header { text-align: center; margin-bottom: 24px; }
+        .header h1 { color: var(--blue-egehid); font-size: 1.8rem; margin: 0; font-weight: 700; }
+        .header p { color: #64748b; font-size: 0.9rem; margin-top: 4px; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .full-width { grid-column: span 2; }
+        .form-group { margin-bottom: 12px; }
+        label { display: block; font-size: 0.85rem; font-weight: 600; color: #334155; margin-bottom: 6px; }
+        input, select { width: 100%; padding: 10px 12px; border-radius: 6px; border: 1px solid #cbd5e1; box-sizing: border-box; font-size: 0.9rem; }
+        input:focus { border-color: var(--blue-egehid); outline: none; box-shadow: 0 0 0 3px rgba(0,86,210,0.15); }
+        button { width: 100%; background: linear-gradient(135deg, var(--blue-egehid), var(--blue-dark)); color: white; padding: 12px; border: none; border-radius: 6px; font-size: 1rem; font-weight: 700; cursor: pointer; transition: all 0.3s ease; }
+        button:hover { opacity: 0.95; transform: translateY(-1px); }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <div class="header">
+        <h1>egehid</h1>
+        <p>La energía sostenible del país • Sistema de Registro de Soporte</p>
+    </div>
+
+    <form id="ticketForm">
+        <div class="form-grid">
+            <!-- Técnico Principal -->
+            <div class="form-group">
+                <label>Técnico Principal *</label>
+                <input list="list-tecnicos" id="tecnico" placeholder="Escriba o seleccione..." required>
+                <datalist id="list-tecnicos"></datalist>
+            </div>
+
+            <!-- Técnico Compañero -->
+            <div class="form-group">
+                <label>Técnico Compañero <small style="color: #64748b;">(Opcional)</small></label>
+                <input list="list-tecnicos-comp" id="tecnico_companero" placeholder="Escriba o seleccione...">
+                <datalist id="list-tecnicos-comp"></datalist>
+            </div>
+
+            <!-- Colaborador / Solicitante -->
+            <div class="form-group">
+                <label>Colaborador / Solicitante *</label>
+                <input type="text" id="colaborador" required placeholder="Nombre del colaborador">
+            </div>
+
+            <!-- Número de Extensión -->
+            <div class="form-group">
+                <label>Número de Extensión *</label>
+                <input type="text" id="extension" required placeholder="Ej: 4022">
+            </div>
+
+            <!-- Ubicación -->
+            <div class="form-group">
+                <label>Ubicación *</label>
+                <input list="list-ubicaciones" id="ubicacion" placeholder="Escriba o seleccione..." required>
+                <datalist id="list-ubicaciones"></datalist>
+            </div>
+
+            <!-- Dirección / Departamento -->
+            <div class="form-group">
+                <label>Dirección / Departamento *</label>
+                <input list="list-departamentos" id="departamento" placeholder="Escriba o seleccione..." required>
+                <datalist id="list-departamentos"></datalist>
+            </div>
+
+            <!-- Equipo Atendido -->
+            <div class="form-group">
+                <label>Equipo Atendido *</label>
+                <input list="list-equipos" id="equipo" placeholder="Escriba o seleccione..." required>
+                <datalist id="list-equipos"></datalist>
+            </div>
+
+            <!-- Nivel de Soporte -->
+            <div class="form-group">
+                <label>Nivel de Soporte *</label>
+                <input list="list-niveles" id="nivel" placeholder="Escriba o seleccione..." required>
+                <datalist id="list-niveles"></datalist>
+            </div>
+
+            <!-- Detalle Soporte -->
+            <div class="form-group full-width">
+                <label>Detalle del Soporte / Avería *</label>
+                <input type="text" id="detalle_soporte" required placeholder="Descripción detallada del problema...">
+            </div>
+        </div>
+
+        <button type="submit" id="btn-submit" style="margin-top: 16px;">Registrar Ticket de Soporte</button>
+    </form>
+</div>
+
+<script>
+    const API = 'http://127.0.0.1:8000/api';
+
+    async function cargarCatalogos() {
+        try {
+            const res = await fetch(`${API}/catalogos`);
+            if (!res.ok) return;
+            const data = await res.json();
+
+            const poblarDatalist = (id, lista) => {
+                const dl = document.getElementById(id);
+                if (dl && Array.isArray(lista)) {
+                    dl.innerHTML = lista.map(item => `<option value="${item}"></option>`).join('');
+                }
+            };
+
+            poblarDatalist('list-tecnicos', data.tecnicos);
+            poblarDatalist('list-tecnicos-comp', data.tecnicos);
+            poblarDatalist('list-ubicaciones', data.ubicaciones);
+            poblarDatalist('list-departamentos', data.departamentos);
+            poblarDatalist('list-equipos', data.equipos);
+            poblarDatalist('list-niveles', data.niveles);
+        } catch (error) {
+            console.error('Error al cargar los catálogos:', error);
+        }
+    }
+
+    document.getElementById('ticketForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const btnSubmit = document.getElementById('btn-submit');
+        btnSubmit.disabled = true;
+        btnSubmit.innerText = 'Guardando en BD...';
+
+        const payload = {
+            tecnico: document.getElementById('tecnico').value,
+            tecnico_companero: document.getElementById('tecnico_companero').value || 'NO APLICA',
+            colaborador: document.getElementById('colaborador').value,
+            extension: document.getElementById('extension').value,
+            ubicacion: document.getElementById('ubicacion').value,
+            departamento: document.getElementById('departamento').value,
+            equipo: document.getElementById('equipo').value,
+            nivel: document.getElementById('nivel').value,
+            detalle_soporte: document.getElementById('detalle_soporte').value
+        };
+
+        try {
+            const res = await fetch(`${API}/crear-ticket`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                const ticketId = data.id_ticket || data.id || 'N/A';
+                const horaInicio = data.hora_inicio || 'Registrada';
+                alert(`✅ Ticket ${ticketId} registrado con éxito en la BD.\nHora de Inicio: ${horaInicio}`);
+                document.getElementById('ticketForm').reset();
+            } else {
+                alert('⚠️ No se pudo registrar el ticket. Verifica los campos e intentalo de nuevo.');
+            }
+        } catch (error) {
+            alert('❌ Error de conexión con el backend SQLite/FastAPI.');
+        } finally {
+            btnSubmit.disabled = false;
+            btnSubmit.innerText = 'Registrar Ticket de Soporte';
+        }
+    });
+
+    cargarCatalogos();
+</script>
+
+</body>
+</html>

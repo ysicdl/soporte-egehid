@@ -1,0 +1,12 @@
+# Carpetas de PyInstaller
+build/
+dist/
+*.spec
+
+# Entornos virtuales y caché
+__pycache__/
+*.pyc
+venv/
+
+# Base de datos local (Render manejará la suya)
+soporte.db
