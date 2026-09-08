@@ -1,0 +1,25 @@
+CARPETA LISTA PARA IIS — Sistema de Soporte EGEHID (backend .NET)
+================================================================
+
+Copia TODO el contenido de esta carpeta a la carpeta del sitio en IIS,
+por ejemplo:  C:\inetpub\soporte-egehid\
+
+Requisitos en el servidor (ya presentes si corres otras APIs .NET):
+  - Runtime "ASP.NET Core 8" (Hosting Bundle)
+  - Modulo AspNetCoreModuleV2 en IIS
+
+Pasos:
+  1. Copia estos archivos a la carpeta del sitio.
+  2. En IIS: crea el sitio o aplicacion apuntando a esa carpeta.
+     Application Pool = "No Managed Code".
+  3. Da permiso de Modificar al App Pool sobre la carpeta (para soporte.db):
+       icacls "C:\inetpub\soporte-egehid" /grant "IIS AppPool\<TuPool>:(OI)(CI)M"
+  4. Prueba:  http://<servidor>/api/health  -> {"status":"ok"}
+
+La base de datos soporte.db se crea sola al primer arranque.
+Si ya tienes datos previos, copia tu soporte.db a esta carpeta.
+
+Si falla al arrancar: en web.config pon stdoutLogEnabled="true",
+crea la carpeta logs\ con permiso de escritura y revisa logs\stdout_*.log.
+
+Guia completa: iis-dotnet/DESPLIEGUE_IIS_DOTNET.md en el repositorio.
