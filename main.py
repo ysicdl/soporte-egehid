@@ -2,16 +2,14 @@ import io
 import os
 import sys
 import uuid
-import time
 import sqlite3
-import threading
-import openpyxl
-import urllib.request
+from contextlib import contextmanager
 from datetime import datetime
 
+import openpyxl
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, FileResponse
+from fastapi.responses import StreamingResponse, FileResponse, RedirectResponse
 from pydantic import BaseModel
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
@@ -20,73 +18,103 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 # -------------------------------------------------------------
 app = FastAPI(title="Sistema de Soporte EGEHID")
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# En despliegue web el frontend se sirve desde el mismo origen, así que no se
+# necesita CORS abierto. Se permite configurar orígenes extra por variable de
+# entorno (separados por coma). Sin credenciales -> evita el combo inseguro
+# "allow_origins=* + allow_credentials=True".
+_origins = os.environ.get("ALLOWED_ORIGINS", "").strip()
+allow_origins = [o.strip() for o in _origins.split(",") if o.strip()] if _origins else []
+if allow_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=allow_origins,
+        allow_credentials=False,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 # RUTA ABSOLUTA UNIFICADA DE LA BASE DE DATOS
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, "soporte.db")
+# Permite reubicar la BD fuera del directorio de la app (recomendado en IIS,
+# p. ej. una carpeta de datos con permisos de escritura para el App Pool).
+DB_PATH = os.environ.get("SOPORTE_DB_PATH", os.path.join(BASE_DIR, "soporte.db"))
+
 
 def obtener_ruta_recurso(nombre_archivo):
-    """ Resuelve la ruta absoluta exacta del archivo HTML """
-    if hasattr(sys, '_MEIPASS'):
-        base_path = sys._MEIPASS
-    else:
-        base_path = BASE_DIR
+    """ Resuelve la ruta absoluta del archivo estático (HTML, ico, ...). """
+    base_path = getattr(sys, "_MEIPASS", BASE_DIR)
     return os.path.join(base_path, nombre_archivo)
+
 
 # -------------------------------------------------------------
 # BASE DE DATOS SQLITE (CON MODO WAL)
 # -------------------------------------------------------------
+@contextmanager
+def get_db():
+    """ Conexión con cierre garantizado, incluso ante excepciones. """
+    conn = sqlite3.connect(DB_PATH, timeout=10)
+    try:
+        yield conn
+    finally:
+        conn.close()
+
+
 def init_db():
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute('PRAGMA journal_mode=WAL;')
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS tickets (
-            id_ticket TEXT PRIMARY KEY,
-            tecnico TEXT,
-            tecnico_companero TEXT,
-            ubicacion TEXT,
-            departamento TEXT,
-            detalle_soporte TEXT,
-            equipo TEXT,
-            colaborador TEXT,
-            nivel TEXT,
-            estado TEXT,
-            fecha TEXT,
-            hora_inicio TEXT,
-            hora_final TEXT,
-            tiempo_total REAL,
-            extension TEXT
-        )
-    ''')
-    conn.commit()
-    conn.close()
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL;")
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS tickets (
+                id_ticket TEXT PRIMARY KEY,
+                tecnico TEXT,
+                tecnico_companero TEXT,
+                ubicacion TEXT,
+                departamento TEXT,
+                detalle_soporte TEXT,
+                equipo TEXT,
+                colaborador TEXT,
+                nivel TEXT,
+                estado TEXT,
+                fecha TEXT,
+                hora_inicio TEXT,
+                hora_final TEXT,
+                tiempo_total REAL,
+                extension TEXT
+            )
+        ''')
+        conn.commit()
+
 
 init_db()
 
 # -------------------------------------------------------------
 # ENDPOINTS PARA SERVIR VISTAS HTML
 # -------------------------------------------------------------
+@app.get("/")
+async def raiz():
+    return RedirectResponse(url="monitoreo")
+
+
 @app.get("/formulario")
 async def servir_formulario():
-    ruta = obtener_ruta_recurso("forms_soporte_ui_3.html")
+    ruta = obtener_ruta_recurso("forms_soporte_ui.html")
     if not os.path.exists(ruta):
-        ruta = obtener_ruta_recurso("formulario.html")
+        raise HTTPException(status_code=404, detail="Vista de formulario no encontrada")
     return FileResponse(ruta)
+
 
 @app.get("/monitoreo")
 async def servir_monitoreo():
-    ruta = obtener_ruta_recurso("monitoreo_3.html")
+    ruta = obtener_ruta_recurso("monitoreo.html")
     if not os.path.exists(ruta):
-        ruta = obtener_ruta_recurso("monitoreo.html")
+        raise HTTPException(status_code=404, detail="Vista de monitoreo no encontrada")
     return FileResponse(ruta)
+
+
+@app.get("/api/health")
+async def health():
+    return {"status": "ok"}
+
 
 # -------------------------------------------------------------
 # DATASET MAESTRO (EGEHID)
@@ -135,6 +163,11 @@ EQUIPOS = ["OTRO", "PC", "PRINTER", "PC/PRINTER", "PROYECTOR", "RED/INTERNET", "
 NIVELES = ["NIVEL1", "NIVEL2", "NIVEL3"]
 ESTADOS = ["RESUELTO", "NO RESUELTO", "PROCESO", "PROCESO/ RETIRO DE EQUIPO", "PENDIENTE", "ANULADO"]
 
+# Conjuntos para validación (normalizados en mayúsculas)
+_NIVELES_SET = {n.upper() for n in NIVELES}
+_ESTADOS_SET = {e.upper() for e in ESTADOS}
+
+
 # -------------------------------------------------------------
 # MODELOS DE DATOS (PYDANTIC)
 # -------------------------------------------------------------
@@ -149,6 +182,7 @@ class TicketRequest(BaseModel):
     extension: str
     tecnico_companero: str = "NO APLICA"
 
+
 class TicketEditarRequest(BaseModel):
     id_ticket: str
     tecnico: str
@@ -162,9 +196,36 @@ class TicketEditarRequest(BaseModel):
     detalle_soporte: str
     estado: str = "PENDIENTE"
 
+
 class ActualizarEstadoRequest(BaseModel):
     id_ticket: str
     nuevo_estado: str
+
+
+def _validar_nivel(nivel: str) -> str:
+    n = (nivel or "").strip().upper()
+    if n not in _NIVELES_SET:
+        raise HTTPException(status_code=422, detail=f"Nivel inválido: {nivel}")
+    return n
+
+
+def _validar_estado(estado: str) -> str:
+    e = (estado or "").strip().upper()
+    if e not in _ESTADOS_SET:
+        raise HTTPException(status_code=422, detail=f"Estado inválido: {estado}")
+    return e
+
+
+def _calcular_cierre(fecha_str, hora_inicio_str):
+    """ Devuelve (hora_final, tiempo_total_min) al pasar a RESUELTO. """
+    try:
+        inicio_dt = datetime.strptime(f"{fecha_str} {hora_inicio_str}", "%Y-%m-%d %H:%M:%S")
+        ahora_dt = datetime.now()
+        diff_segundos = (ahora_dt - inicio_dt).total_seconds()
+        return ahora_dt.strftime("%H:%M:%S"), round(max(diff_segundos, 0) / 60, 2)
+    except Exception:
+        return datetime.now().strftime("%H:%M:%S"), 1.0
+
 
 # -------------------------------------------------------------
 # ENDPOINTS API (SOPORTE Y BASE DE DATOS)
@@ -180,9 +241,11 @@ async def obtener_catalogos():
         "estados": ESTADOS
     }
 
+
 @app.post("/api/crear-ticket")
 async def crear_ticket(ticket: TicketRequest):
     try:
+        nivel = _validar_nivel(ticket.nivel)
         ahora = datetime.now()
         id_ticket = f"TK-{uuid.uuid4().hex[:6].upper()}"
         fecha = ahora.strftime("%Y-%m-%d")
@@ -190,145 +253,128 @@ async def crear_ticket(ticket: TicketRequest):
         estado_inicial = "PENDIENTE"
         companero = ticket.tecnico_companero.strip() if ticket.tecnico_companero and ticket.tecnico_companero.strip() else "NO APLICA"
 
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute('''
-            INSERT INTO tickets (
-                id_ticket, tecnico, tecnico_companero, ubicacion, departamento,
-                detalle_soporte, equipo, colaborador, nivel, estado,
-                fecha, hora_inicio, hora_final, tiempo_total, extension
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            id_ticket, ticket.tecnico, companero, ticket.ubicacion, ticket.departamento,
-            ticket.detalle_soporte, ticket.equipo, ticket.colaborador, ticket.nivel, estado_inicial,
-            fecha, hora_inicio, "--", 0.0, ticket.extension.strip()
-        ))
-        conn.commit()
-        conn.close()
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO tickets (
+                    id_ticket, tecnico, tecnico_companero, ubicacion, departamento,
+                    detalle_soporte, equipo, colaborador, nivel, estado,
+                    fecha, hora_inicio, hora_final, tiempo_total, extension
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                id_ticket, ticket.tecnico, companero, ticket.ubicacion, ticket.departamento,
+                ticket.detalle_soporte, ticket.equipo, ticket.colaborador, nivel, estado_inicial,
+                fecha, hora_inicio, "--", 0.0, ticket.extension.strip()
+            ))
+            conn.commit()
 
         return {"status": "success", "id_ticket": id_ticket, "hora_inicio": hora_inicio}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.put("/api/editar-ticket")
 async def editar_ticket(ticket: TicketEditarRequest):
     try:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        
+        nivel = _validar_nivel(ticket.nivel)
+        nuevo_est = _validar_estado(ticket.estado)
         target_id = ticket.id_ticket.strip().upper()
-        cursor.execute("SELECT fecha, hora_inicio FROM tickets WHERE UPPER(id_ticket) = ?", (target_id,))
-        existente = cursor.fetchone()
 
-        if not existente:
-            conn.close()
-            raise HTTPException(status_code=404, detail=f"Ticket {ticket.id_ticket} no encontrado")
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT fecha, hora_inicio FROM tickets WHERE UPPER(id_ticket) = ?", (target_id,))
+            existente = cursor.fetchone()
 
-        nuevo_est = ticket.estado.strip().upper()
-        hora_final = "--"
-        tiempo_total = 0.0
+            if not existente:
+                raise HTTPException(status_code=404, detail=f"Ticket {ticket.id_ticket} no encontrado")
 
-        if nuevo_est == "RESUELTO":
-            fecha_str, hora_inicio_str = existente[0], existente[1]
-            try:
-                inicio_dt = datetime.strptime(f"{fecha_str} {hora_inicio_str}", "%Y-%m-%d %H:%M:%S")
-                ahora_dt = datetime.now()
-                diff_segundos = (ahora_dt - inicio_dt).total_seconds()
-                tiempo_total = round(max(diff_segundos, 0) / 60, 2)
-                hora_final = ahora_dt.strftime("%H:%M:%S")
-            except Exception:
-                hora_final = datetime.now().strftime("%H:%M:%S")
-                tiempo_total = 1.0
+            hora_final = "--"
+            tiempo_total = 0.0
+            if nuevo_est == "RESUELTO":
+                hora_final, tiempo_total = _calcular_cierre(existente[0], existente[1])
 
-        cursor.execute('''
-            UPDATE tickets
-            SET tecnico = ?, tecnico_companero = ?, colaborador = ?, extension = ?,
-                ubicacion = ?, departamento = ?, equipo = ?, nivel = ?,
-                detalle_soporte = ?, estado = ?, hora_final = ?, tiempo_total = ?
-            WHERE UPPER(id_ticket) = ?
-        ''', (
-            ticket.tecnico, ticket.tecnico_companero, ticket.colaborador, ticket.extension,
-            ticket.ubicacion, ticket.departamento, ticket.equipo, ticket.nivel,
-            ticket.detalle_soporte, nuevo_est, hora_final, tiempo_total, target_id
-        ))
-        
-        conn.commit()
-        conn.close()
+            cursor.execute('''
+                UPDATE tickets
+                SET tecnico = ?, tecnico_companero = ?, colaborador = ?, extension = ?,
+                    ubicacion = ?, departamento = ?, equipo = ?, nivel = ?,
+                    detalle_soporte = ?, estado = ?, hora_final = ?, tiempo_total = ?
+                WHERE UPPER(id_ticket) = ?
+            ''', (
+                ticket.tecnico, ticket.tecnico_companero, ticket.colaborador, ticket.extension,
+                ticket.ubicacion, ticket.departamento, ticket.equipo, nivel,
+                ticket.detalle_soporte, nuevo_est, hora_final, tiempo_total, target_id
+            ))
+            conn.commit()
+
         return {"status": "success", "message": f"Ticket {target_id} actualizado exitosamente."}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.delete("/api/eliminar-ticket/{id_ticket}")
 async def eliminar_ticket(id_ticket: str):
     try:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
         target_id = id_ticket.strip().upper()
-        
-        cursor.execute("DELETE FROM tickets WHERE UPPER(id_ticket) = ?", (target_id,))
-        filas_afectadas = cursor.rowcount
-        conn.commit()
-        conn.close()
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM tickets WHERE UPPER(id_ticket) = ?", (target_id,))
+            filas_afectadas = cursor.rowcount
+            conn.commit()
 
         if filas_afectadas == 0:
             raise HTTPException(status_code=404, detail=f"Ticket {id_ticket} no encontrado")
 
         return {"status": "success", "message": f"Ticket {target_id} eliminado exitosamente."}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.post("/api/actualizar-estado")
 async def actualizar_estado(req: ActualizarEstadoRequest):
     try:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        
+        nuevo_est = _validar_estado(req.nuevo_estado)
         target_id = req.id_ticket.strip().upper()
-        nuevo_est = req.nuevo_estado.strip().upper()
 
-        cursor.execute("SELECT fecha, hora_inicio FROM tickets WHERE UPPER(id_ticket) = ?", (target_id,))
-        ticket = cursor.fetchone()
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT fecha, hora_inicio FROM tickets WHERE UPPER(id_ticket) = ?", (target_id,))
+            ticket = cursor.fetchone()
 
-        if not ticket:
-            conn.close()
-            raise HTTPException(status_code=404, detail=f"Ticket {req.id_ticket} no encontrado")
+            if not ticket:
+                raise HTTPException(status_code=404, detail=f"Ticket {req.id_ticket} no encontrado")
 
-        hora_final = "--"
-        tiempo_total = 0.0
+            hora_final = "--"
+            tiempo_total = 0.0
+            if nuevo_est == "RESUELTO":
+                hora_final, tiempo_total = _calcular_cierre(ticket[0], ticket[1])
 
-        if nuevo_est == "RESUELTO":
-            fecha_str, hora_inicio_str = ticket[0], ticket[1]
-            try:
-                inicio_dt = datetime.strptime(f"{fecha_str} {hora_inicio_str}", "%Y-%m-%d %H:%M:%S")
-                ahora_dt = datetime.now()
-                diff_segundos = (ahora_dt - inicio_dt).total_seconds()
-                tiempo_total = round(max(diff_segundos, 0) / 60, 2)
-                hora_final = ahora_dt.strftime("%H:%M:%S")
-            except Exception:
-                hora_final = datetime.now().strftime("%H:%M:%S")
-                tiempo_total = 1.0
-
-        cursor.execute('''
-            UPDATE tickets 
-            SET estado = ?, hora_final = ?, tiempo_total = ?
-            WHERE UPPER(id_ticket) = ?
-        ''', (nuevo_est, hora_final, tiempo_total, target_id))
-        
-        conn.commit()
-        conn.close()
+            cursor.execute('''
+                UPDATE tickets
+                SET estado = ?, hora_final = ?, tiempo_total = ?
+                WHERE UPPER(id_ticket) = ?
+            ''', (nuevo_est, hora_final, tiempo_total, target_id))
+            conn.commit()
 
         return {"status": "success", "message": f"Estado de {req.id_ticket} actualizado a {nuevo_est}"}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/api/tickets")
 async def obtener_tickets():
     try:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("SELECT id_ticket, tecnico, tecnico_companero, ubicacion, departamento, detalle_soporte, equipo, colaborador, nivel, estado, fecha, hora_inicio, hora_final, tiempo_total, extension FROM tickets ORDER BY fecha DESC, hora_inicio DESC")
-        rows = cursor.fetchall()
-        conn.close()
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id_ticket, tecnico, tecnico_companero, ubicacion, departamento, detalle_soporte, equipo, colaborador, nivel, estado, fecha, hora_inicio, hora_final, tiempo_total, extension FROM tickets ORDER BY fecha DESC, hora_inicio DESC")
+            rows = cursor.fetchall()
 
         tickets = []
         for row in rows:
@@ -353,14 +399,14 @@ async def obtener_tickets():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.get("/api/descargar-excel")
 async def descargar_excel():
     try:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("SELECT id_ticket, tecnico, tecnico_companero, ubicacion, departamento, detalle_soporte, equipo, colaborador, nivel, estado, fecha, hora_inicio, hora_final, tiempo_total, extension FROM tickets ORDER BY fecha DESC, hora_inicio DESC")
-        filas = cursor.fetchall()
-        conn.close()
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id_ticket, tecnico, tecnico_companero, ubicacion, departamento, detalle_soporte, equipo, colaborador, nivel, estado, fecha, hora_inicio, hora_final, tiempo_total, extension FROM tickets ORDER BY fecha DESC, hora_inicio DESC")
+            filas = cursor.fetchall()
 
         wb = openpyxl.Workbook()
         ws = wb.active
@@ -410,26 +456,14 @@ async def descargar_excel():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 # -------------------------------------------------------------
-# ARRANQUE DE LA APLICACIÓN DE ESCRITORIO (PYWEBVIEW)
+# ARRANQUE PARA DESARROLLO LOCAL
 # -------------------------------------------------------------
+# En IIS el proceso lo lanza HttpPlatformHandler (ver web.config) usando:
+#   python -m uvicorn main:app --host 127.0.0.1 --port %HTTP_PLATFORM_PORT%
+# Este bloque solo aplica al ejecutar "python main.py" en tu máquina.
 if __name__ == "__main__":
     import uvicorn
-    import webview
-
-    def iniciar_backend():
-        uvicorn.run(app, host="127.0.0.1", port=8000, log_level="error")
-
-    hilo_backend = threading.Thread(target=iniciar_backend, daemon=True)
-    hilo_backend.start()
-
-    for _ in range(10):
-        try:
-            res = urllib.request.urlopen("http://127.0.0.1:8000/api/tickets", timeout=1)
-            if res.status == 200:
-                break
-        except Exception:
-            time.sleep(0.5)
-
-    webview.create_window("Sistema de Soporte EGEHID - Monitoreo", "http://127.0.0.1:8000/monitoreo", width=1300, height=850)
-    webview.start()
+    port = int(os.environ.get("HTTP_PLATFORM_PORT", os.environ.get("PORT", "8000")))
+    uvicorn.run(app, host="127.0.0.1", port=port, log_level="info")

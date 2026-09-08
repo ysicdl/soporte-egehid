@@ -76,6 +76,28 @@
         .modal-item span, .modal-item input, .modal-item select { font-weight: 500; margin-top: 4px; }
         .modal-item.full { grid-column: span 2; }
         .action-btns { display: flex; gap: 6px; }
+        .btn-sm { padding: 5px 10px; font-size: 0.8rem; }
+
+        /* Combobox buscable */
+        .modal-item { position: relative; }
+        .combo-list { position: absolute; left: 0; right: 0; top: 100%; z-index: 60; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; margin-top: 2px; max-height: 190px; overflow-y: auto; box-shadow: 0 6px 18px rgba(0,0,0,0.18); display: none; }
+        .combo-list.open { display: block; }
+        .combo-item { padding: 8px 12px; font-size: 0.85rem; cursor: pointer; color: var(--text-primary); }
+        .combo-item:hover, .combo-item.active { background: var(--bg-proceso); color: var(--txt-proceso); }
+        .combo-empty { padding: 8px 12px; color: var(--text-secondary); font-size: 0.8rem; }
+
+        /* Modal de mensajes */
+        .app-modal-overlay { display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.55); z-index: 2000; align-items: center; justify-content: center; }
+        .app-modal-overlay.show { display: flex; }
+        .app-modal { background: var(--card-bg); border-radius: 10px; padding: 24px 26px; width: 420px; max-width: 92%; box-shadow: 0 20px 50px rgba(0,0,0,0.3); border-top: 4px solid var(--primary); }
+        .app-modal.error { border-top-color: var(--danger); }
+        .app-modal h3 { margin: 0 0 10px; font-size: 1.1rem; color: var(--text-primary); }
+        .app-modal p { margin: 0 0 20px; font-size: 0.9rem; color: var(--text-secondary); line-height: 1.5; white-space: pre-line; }
+        .app-modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
+        .modal-btn { padding: 9px 18px; border-radius: 6px; font-size: 0.875rem; font-weight: 600; cursor: pointer; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-primary); }
+        .modal-btn-primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+        .modal-btn-danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+        .modal-btn:hover { opacity: 0.92; }
     </style>
 </head>
 <body>
@@ -88,8 +110,9 @@
         </div>
         <div class="header-actions">
             <span id="last-update" style="font-size: 0.8rem; color: var(--text-secondary);">Sincronizando...</span>
-            <button class="btn" onclick="toggleTheme()" id="theme-btn">🌙 Modo Oscuro</button>
-            <button class="btn" onclick="cargarTickets()">🔄 Actualizar</button>
+            <a class="btn btn-primary" href="formulario" style="text-decoration: none;">Nuevo Ticket</a>
+            <button class="btn" onclick="toggleTheme()" id="theme-btn">Modo Oscuro</button>
+            <button class="btn" onclick="cargarTickets()">Actualizar</button>
         </div>
     </div>
 
@@ -116,7 +139,7 @@
         </div>
     </div>
 
-    <div style="font-weight: 700; margin-bottom: 12px;">🔍 Monitoreo General y Búsqueda</div>
+    <div style="font-weight: 700; margin-bottom: 12px;">Monitoreo General y Búsqueda</div>
 
     <div class="controls-card">
         <input type="text" id="search-input" class="input-control" style="flex: 1; max-width: 400px;" placeholder="Buscar ticket, colaborador, extensión..." oninput="filtrarTabla()">
@@ -166,7 +189,7 @@
     <div class="modal-content">
         <div class="modal-header">
             <h3>Detalles del Soporte</h3>
-            <button class="btn" onclick="cerrarModal('modal-detalles')">✕</button>
+            <button class="btn" onclick="cerrarModal('modal-detalles')">Cerrar</button>
         </div>
         <div class="modal-grid">
             <div class="modal-item"><label>ID Ticket</label><span id="md-id">--</span></div>
@@ -185,9 +208,9 @@
             <div class="modal-item full"><label>Detalle del Soporte</label><span id="md-detalle" style="background: var(--table-header-bg); padding: 10px; border-radius: 6px; margin-top: 4px;">--</span></div>
         </div>
         <div style="margin-top: 20px; display: flex; justify-content: space-between;">
-            <button class="btn btn-danger" id="md-btn-eliminar">🗑️ Eliminar</button>
+            <button class="btn btn-danger" id="md-btn-eliminar">Eliminar</button>
             <div>
-                <button class="btn btn-warning" id="md-btn-editar">✏️ Editar</button>
+                <button class="btn btn-warning" id="md-btn-editar">Editar</button>
                 <button class="btn btn-primary" onclick="cerrarModal('modal-detalles')">Cerrar</button>
             </div>
         </div>
@@ -199,18 +222,18 @@
     <div class="modal-content">
         <div class="modal-header">
             <h3>Editar Soporte - <span id="me-id-title"></span></h3>
-            <button class="btn" onclick="cerrarModal('modal-editar')">✕</button>
+            <button class="btn" onclick="cerrarModal('modal-editar')">Cerrar</button>
         </div>
         <form id="form-editar-ticket" onsubmit="guardarEdicionTicket(event)">
             <input type="hidden" id="me-id">
             <div class="modal-grid">
                 <div class="modal-item">
                     <label>Técnico Principal *</label>
-                    <input list="dl-tecnicos" id="me-tecnico" class="input-control" required>
+                    <input id="me-tecnico" class="input-control" required>
                 </div>
                 <div class="modal-item">
                     <label>Técnico Compañero</label>
-                    <input list="dl-tecnicos" id="me-companero" class="input-control">
+                    <input id="me-companero" class="input-control">
                 </div>
                 <div class="modal-item">
                     <label>Solicitante / Colaborador *</label>
@@ -222,15 +245,15 @@
                 </div>
                 <div class="modal-item">
                     <label>Ubicación *</label>
-                    <input list="dl-ubicaciones" id="me-ubicacion" class="input-control" required>
+                    <input id="me-ubicacion" class="input-control" required>
                 </div>
                 <div class="modal-item">
                     <label>Departamento *</label>
-                    <input list="dl-departamentos" id="me-departamento" class="input-control" required>
+                    <input id="me-departamento" class="input-control" required>
                 </div>
                 <div class="modal-item">
                     <label>Equipo Atendido *</label>
-                    <input list="dl-equipos" id="me-equipo" class="input-control" required>
+                    <input id="me-equipo" class="input-control" required>
                 </div>
                 <div class="modal-item">
                     <label>Prioridad / Nivel *</label>
@@ -254,10 +277,6 @@
                     <input type="text" id="me-detalle" class="input-control" required>
                 </div>
             </div>
-            <datalist id="dl-tecnicos"></datalist>
-            <datalist id="dl-ubicaciones"></datalist>
-            <datalist id="dl-departamentos"></datalist>
-            <datalist id="dl-equipos"></datalist>
             <div style="margin-top: 20px; text-align: right; display: flex; justify-content: flex-end; gap: 10px;">
                 <button type="button" class="btn" onclick="cerrarModal('modal-editar')">Cancelar</button>
                 <button type="submit" class="btn btn-primary">Guardar Cambios</button>
@@ -266,16 +285,33 @@
     </div>
 </div>
 
+<!-- Modal de mensajes / confirmaciones -->
+<div id="app-modal" class="app-modal-overlay">
+    <div class="app-modal" id="app-modal-box">
+        <h3 id="app-modal-title"></h3>
+        <p id="app-modal-msg"></p>
+        <div class="app-modal-actions" id="app-modal-actions"></div>
+    </div>
+</div>
+
 <script>
-    const SERVER_BASE = 'http://127.0.0.1:8000';
+    // Base relativa: funciona tanto en sitio raíz como en aplicación virtual de IIS.
+    const SERVER_BASE = window.location.pathname.replace(/\/(monitoreo|formulario)\/?$/, '');
     const API_URL = `${SERVER_BASE}/api/tickets`;
     const UPDATE_ESTADO_URL = `${SERVER_BASE}/api/actualizar-estado`;
     let ticketsData = [];
 
+    // Escapa texto para interpolarlo con seguridad en HTML (previene XSS almacenado).
+    function esc(valor) {
+        return String(valor ?? '').replace(/[&<>"']/g, c => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[c]));
+    }
+
     function initTheme() {
         const savedTheme = localStorage.getItem('theme') || 'light';
         document.documentElement.setAttribute('data-theme', savedTheme);
-        document.getElementById('theme-btn').innerText = savedTheme === 'dark' ? '☀️ Modo Claro' : '🌙 Modo Oscuro';
+        document.getElementById('theme-btn').innerText = savedTheme === 'dark' ? 'Modo Claro' : 'Modo Oscuro';
     }
 
     function toggleTheme() {
@@ -283,7 +319,77 @@
         const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
         document.documentElement.setAttribute('data-theme', newTheme);
         localStorage.setItem('theme', newTheme);
-        document.getElementById('theme-btn').innerText = newTheme === 'dark' ? '☀️ Modo Claro' : '🌙 Modo Oscuro';
+        document.getElementById('theme-btn').innerText = newTheme === 'dark' ? 'Modo Claro' : 'Modo Oscuro';
+    }
+
+    // ---------- Combobox buscable reutilizable ----------
+    function makeCombo(input, options) {
+        input.setAttribute('autocomplete', 'off');
+        let list = input.parentNode.querySelector('.combo-list');
+        if (list) list.remove();
+        list = document.createElement('div');
+        list.className = 'combo-list';
+        input.parentNode.appendChild(list);
+        input._comboOptions = options;
+        let current = [];
+        let activeIndex = -1;
+
+        function render() {
+            const f = (input.value || '').toLowerCase();
+            current = (input._comboOptions || []).filter(o => o.toLowerCase().includes(f));
+            activeIndex = -1;
+            list.innerHTML = current.length
+                ? current.map((o, i) => `<div class="combo-item" data-i="${i}">${esc(o)}</div>`).join('')
+                : '<div class="combo-empty">Sin coincidencias</div>';
+            list.classList.add('open');
+        }
+        function close() { list.classList.remove('open'); activeIndex = -1; }
+        function choose(i) {
+            if (current[i] !== undefined) { input.value = current[i]; close(); input.dispatchEvent(new Event('change')); }
+        }
+
+        input.addEventListener('focus', render);
+        input.addEventListener('input', render);
+        input.addEventListener('blur', () => setTimeout(close, 150));
+        list.addEventListener('mousedown', e => {
+            const it = e.target.closest('.combo-item');
+            if (it) { e.preventDefault(); choose(parseInt(it.dataset.i, 10)); }
+        });
+        input.addEventListener('keydown', e => {
+            const items = Array.from(list.querySelectorAll('.combo-item'));
+            if (e.key === 'ArrowDown') { e.preventDefault(); if (!list.classList.contains('open')) render(); activeIndex = Math.min(activeIndex + 1, items.length - 1); }
+            else if (e.key === 'ArrowUp') { e.preventDefault(); activeIndex = Math.max(activeIndex - 1, 0); }
+            else if (e.key === 'Enter') { if (list.classList.contains('open') && activeIndex >= 0) { e.preventDefault(); choose(activeIndex); } return; }
+            else if (e.key === 'Escape') { close(); return; }
+            items.forEach((it, i) => it.classList.toggle('active', i === activeIndex));
+            if (items[activeIndex]) items[activeIndex].scrollIntoView({ block: 'nearest' });
+        });
+    }
+
+    // ---------- Modal de mensajes / confirmaciones ----------
+    function showModal({ title, message, error = false, buttons }) {
+        document.getElementById('app-modal-title').textContent = title;
+        document.getElementById('app-modal-msg').textContent = message;
+        document.getElementById('app-modal-box').classList.toggle('error', error);
+        const actions = document.getElementById('app-modal-actions');
+        actions.innerHTML = '';
+        buttons.forEach(b => {
+            const btn = document.createElement('button');
+            btn.textContent = b.label;
+            btn.className = 'modal-btn' + (b.primary ? ' modal-btn-primary' : '') + (b.danger ? ' modal-btn-danger' : '');
+            btn.onclick = () => { document.getElementById('app-modal').classList.remove('show'); b.onClick && b.onClick(); };
+            actions.appendChild(btn);
+        });
+        document.getElementById('app-modal').classList.add('show');
+    }
+    function notify(message, title = 'Información', error = false) {
+        return new Promise(res => showModal({ title, message, error, buttons: [{ label: 'Aceptar', primary: true, onClick: res }] }));
+    }
+    function confirmDialog(message, title = 'Confirmar acción') {
+        return new Promise(res => showModal({ title, message, error: true, buttons: [
+            { label: 'Cancelar', onClick: () => res(false) },
+            { label: 'Eliminar', danger: true, onClick: () => res(true) }
+        ] }));
     }
 
     async function cargarCatalogosModal() {
@@ -291,16 +397,17 @@
             const res = await fetch(`${SERVER_BASE}/api/catalogos`);
             if (!res.ok) return;
             const data = await res.json();
-            
-            const poblarDL = (id, lista) => {
+
+            const wire = (id, lista) => {
                 const el = document.getElementById(id);
-                if (el && Array.isArray(lista)) el.innerHTML = lista.map(item => `<option value="${item}">`).join('');
+                if (el && Array.isArray(lista)) makeCombo(el, lista);
             };
 
-            poblarDL('dl-tecnicos', data.tecnicos);
-            poblarDL('dl-ubicaciones', data.ubicaciones);
-            poblarDL('dl-departamentos', data.departamentos);
-            poblarDL('dl-equipos', data.equipos);
+            wire('me-tecnico', data.tecnicos);
+            wire('me-companero', data.tecnicos);
+            wire('me-ubicacion', data.ubicaciones);
+            wire('me-departamento', data.departamentos);
+            wire('me-equipo', data.equipos);
         } catch (e) {
             console.error('Error al cargar catálogos:', e);
         }
@@ -324,7 +431,7 @@
             document.getElementById('tabla-body').innerHTML = `
                 <tr>
                     <td colspan="9" class="empty-state" style="color: var(--danger);">
-                        ⚠️ No se pudo cargar la información desde la base de datos.
+                        No se pudo cargar la información desde la base de datos.
                     </td>
                 </tr>`;
         }
@@ -369,7 +476,7 @@
         }
 
         tbody.innerHTML = tickets.map(t => {
-            const ticketId = t.id_ticket || t.id;
+            const ticketId = esc(t.id_ticket || t.id);
             const estadoActual = (t.estado || 'PENDIENTE').toUpperCase();
             const nivelActual = (t.nivel || 'NIVEL1').toUpperCase();
             const tiempoTxt = (t.tiempo_total !== undefined && t.tiempo_total !== null) ? t.tiempo_total : (t.tiempo_resolucion || 0);
@@ -377,13 +484,13 @@
             return `
                 <tr>
                     <td><strong>${ticketId}</strong></td>
-                    <td><strong>${t.tecnico}</strong></td>
-                    <td>${t.colaborador}</td>
-                    <td>${t.extension || '--'}</td>
-                    <td>${t.ubicacion}<br><small style="color: var(--text-secondary);">${t.departamento}</small></td>
-                    <td><span class="badge badge-${nivelActual}">${nivelActual}</span></td>
+                    <td><strong>${esc(t.tecnico)}</strong></td>
+                    <td>${esc(t.colaborador)}</td>
+                    <td>${esc(t.extension || '--')}</td>
+                    <td>${esc(t.ubicacion)}<br><small style="color: var(--text-secondary);">${esc(t.departamento)}</small></td>
+                    <td><span class="badge badge-${esc(nivelActual)}">${esc(nivelActual)}</span></td>
                     <td>
-                        <select class="select-estado select-${estadoActual}" onchange="cambiarEstado('${ticketId}', this.value)">
+                        <select class="select-estado select-${esc(estadoActual)}" onchange="cambiarEstado('${ticketId}', this.value)">
                             <option value="PENDIENTE" ${estadoActual === 'PENDIENTE' ? 'selected' : ''}>PENDIENTE</option>
                             <option value="PROCESO" ${estadoActual === 'PROCESO' ? 'selected' : ''}>PROCESO</option>
                             <option value="RESUELTO" ${estadoActual === 'RESUELTO' ? 'selected' : ''}>RESUELTO</option>
@@ -393,9 +500,9 @@
                     <td style="text-align: center; font-weight: 600;">${tiempoTxt}</td>
                     <td>
                         <div class="action-btns">
-                            <button class="btn" title="Ver Detalles completos" onclick="verDetalles('${ticketId}')">👁️</button>
-                            <button class="btn btn-warning" title="Editar ticket" onclick="abrirModalEdicion('${ticketId}')">✏️</button>
-                            <button class="btn btn-danger" title="Eliminar ticket" onclick="eliminarTicket('${ticketId}')">🗑️</button>
+                            <button class="btn btn-sm" title="Ver detalles" onclick="verDetalles('${ticketId}')">Ver</button>
+                            <button class="btn btn-sm btn-warning" title="Editar ticket" onclick="abrirModalEdicion('${ticketId}')">Editar</button>
+                            <button class="btn btn-sm btn-danger" title="Eliminar ticket" onclick="eliminarTicket('${ticketId}')">Eliminar</button>
                         </div>
                     </td>
                 </tr>
@@ -414,11 +521,11 @@
             if (response.ok) {
                 await cargarTickets();
             } else {
-                alert('⚠️ No se pudo actualizar el estado en la base de datos.');
+                await notify('No se pudo actualizar el estado del ticket.', 'Operación no completada', true);
                 await cargarTickets();
             }
         } catch (e) {
-            alert('❌ Error de conexión con el backend.');
+            await notify('Error de conexión con el servidor.', 'Sin conexión', true);
             await cargarTickets();
         }
     }
@@ -503,26 +610,30 @@
             if (res.ok) {
                 cerrarModal('modal-editar');
                 await cargarTickets();
+                await notify(`El ticket ${payload.id_ticket} fue actualizado correctamente.`, 'Cambios guardados');
             } else {
-                alert('⚠️ No se pudo actualizar los datos del ticket.');
+                await notify('No se pudieron actualizar los datos del ticket.', 'Operación no completada', true);
             }
         } catch (e) {
-            alert('❌ Error de conexión con el backend.');
+            await notify('Error de conexión con el servidor.', 'Sin conexión', true);
         }
     }
 
     async function eliminarTicket(idTicket) {
-        if (!confirm(`¿Está seguro de que desea eliminar permanentemente el ticket ${idTicket}?`)) return;
+        const confirmado = await confirmDialog(`¿Está seguro de eliminar permanentemente el ticket ${idTicket}? Esta acción no se puede deshacer.`, 'Eliminar ticket');
+        if (!confirmado) return;
 
         try {
             const res = await fetch(`${SERVER_BASE}/api/eliminar-ticket/${idTicket}`, { method: 'DELETE' });
             if (res.ok) {
+                cerrarModal('modal-detalles');
                 await cargarTickets();
+                await notify(`El ticket ${idTicket} fue eliminado correctamente.`, 'Registro eliminado');
             } else {
-                alert('⚠️ No se pudo eliminar el registro.');
+                await notify('No se pudo eliminar el registro.', 'Operación no completada', true);
             }
         } catch (e) {
-            alert('❌ Error de conexión al servidor.');
+            await notify('Error de conexión con el servidor.', 'Sin conexión', true);
         }
     }
 

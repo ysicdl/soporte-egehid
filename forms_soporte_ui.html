@@ -3,132 +3,224 @@
 <head>
     <meta charset="UTF-8">
     <title>EGEHID - Registro de Soporte Técnico</title>
-    <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
-        :root { --blue-egehid: #0056D2; --blue-dark: #003BB3; --green-accent: #00E676; --bg: #F4F7FA; }
+        :root { --blue-egehid: #0056D2; --blue-dark: #003BB3; --bg: #F4F7FA; --border: #cbd5e1; }
+        * { box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg); margin: 0; padding: 20px; color: #1e293b; }
-        .card { max-width: 700px; margin: 0 auto; background: white; padding: 32px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border-top: 6px solid var(--blue-egehid); }
-        .header { text-align: center; margin-bottom: 24px; }
-        .header h1 { color: var(--blue-egehid); font-size: 1.8rem; margin: 0; font-weight: 700; }
-        .header p { color: #64748b; font-size: 0.9rem; margin-top: 4px; }
+        .card { max-width: 720px; margin: 0 auto; background: white; padding: 32px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border-top: 4px solid var(--blue-egehid); }
+        .topbar { max-width: 720px; margin: 0 auto 12px; display: flex; justify-content: flex-end; }
+        .link-btn { text-decoration: none; color: var(--blue-egehid); font-weight: 600; font-size: 0.875rem; padding: 8px 16px; border: 1px solid var(--border); border-radius: 6px; background: #fff; }
+        .link-btn:hover { background: #f1f5f9; }
+        .header { text-align: center; margin-bottom: 28px; }
+        .header h1 { color: var(--blue-egehid); font-size: 1.6rem; margin: 0; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; }
+        .header p { color: #64748b; font-size: 0.9rem; margin-top: 6px; }
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
         .full-width { grid-column: span 2; }
-        .form-group { margin-bottom: 12px; }
+        .form-group { margin-bottom: 12px; position: relative; }
         label { display: block; font-size: 0.85rem; font-weight: 600; color: #334155; margin-bottom: 6px; }
-        input, select { width: 100%; padding: 10px 12px; border-radius: 6px; border: 1px solid #cbd5e1; box-sizing: border-box; font-size: 0.9rem; }
+        label small { color: #94a3b8; font-weight: 400; }
+        input { width: 100%; padding: 10px 12px; border-radius: 6px; border: 1px solid var(--border); box-sizing: border-box; font-size: 0.9rem; background: #fff; }
         input:focus { border-color: var(--blue-egehid); outline: none; box-shadow: 0 0 0 3px rgba(0,86,210,0.15); }
-        button { width: 100%; background: linear-gradient(135deg, var(--blue-egehid), var(--blue-dark)); color: white; padding: 12px; border: none; border-radius: 6px; font-size: 1rem; font-weight: 700; cursor: pointer; transition: all 0.3s ease; }
-        button:hover { opacity: 0.95; transform: translateY(-1px); }
+        button.submit { width: 100%; background: var(--blue-egehid); color: white; padding: 12px; border: none; border-radius: 6px; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: background 0.2s; margin-top: 16px; }
+        button.submit:hover { background: var(--blue-dark); }
+        button.submit:disabled { opacity: 0.7; cursor: not-allowed; }
+
+        /* Combobox buscable */
+        .combo-list { position: absolute; left: 0; right: 0; top: 100%; z-index: 50; background: #fff; border: 1px solid var(--border); border-radius: 6px; margin-top: 2px; max-height: 190px; overflow-y: auto; box-shadow: 0 6px 18px rgba(0,0,0,0.12); display: none; }
+        .combo-list.open { display: block; }
+        .combo-item { padding: 8px 12px; font-size: 0.875rem; cursor: pointer; }
+        .combo-item:hover, .combo-item.active { background: #eff6ff; color: var(--blue-egehid); }
+        .combo-empty { padding: 8px 12px; color: #94a3b8; font-size: 0.825rem; }
+
+        /* Modal de mensajes */
+        .app-modal-overlay { display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.5); z-index: 1000; align-items: center; justify-content: center; }
+        .app-modal-overlay.show { display: flex; }
+        .app-modal { background: #fff; border-radius: 10px; padding: 24px 26px; width: 420px; max-width: 92%; box-shadow: 0 20px 50px rgba(0,0,0,0.25); border-top: 4px solid var(--blue-egehid); }
+        .app-modal.error { border-top-color: #dc2626; }
+        .app-modal h3 { margin: 0 0 10px; font-size: 1.1rem; color: #0f172a; }
+        .app-modal p { margin: 0 0 20px; font-size: 0.9rem; color: #475569; line-height: 1.5; }
+        .app-modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
+        .modal-btn { padding: 9px 18px; border-radius: 6px; font-size: 0.875rem; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: #fff; color: #334155; }
+        .modal-btn-primary { background: var(--blue-egehid); border-color: var(--blue-egehid); color: #fff; }
+        .modal-btn:hover { opacity: 0.92; }
     </style>
 </head>
 <body>
 
+<div class="topbar">
+    <a href="monitoreo" class="link-btn">Ir al Monitoreo</a>
+</div>
+
 <div class="card">
     <div class="header">
-        <h1>egehid</h1>
-        <p>La energía sostenible del país • Sistema de Registro de Soporte</p>
+        <h1>EGEHID</h1>
+        <p>La energía sostenible del país — Sistema de Registro de Soporte Técnico</p>
     </div>
 
     <form id="ticketForm">
         <div class="form-grid">
-            <!-- Técnico Principal -->
             <div class="form-group">
                 <label>Técnico Principal *</label>
-                <input list="list-tecnicos" id="tecnico" placeholder="Escriba o seleccione..." required>
-                <datalist id="list-tecnicos"></datalist>
+                <input id="tecnico" placeholder="Escriba para buscar..." required>
             </div>
 
-            <!-- Técnico Compañero -->
             <div class="form-group">
-                <label>Técnico Compañero <small style="color: #64748b;">(Opcional)</small></label>
-                <input list="list-tecnicos-comp" id="tecnico_companero" placeholder="Escriba o seleccione...">
-                <datalist id="list-tecnicos-comp"></datalist>
+                <label>Técnico Compañero <small>(Opcional)</small></label>
+                <input id="tecnico_companero" placeholder="Escriba para buscar...">
             </div>
 
-            <!-- Colaborador / Solicitante -->
             <div class="form-group">
                 <label>Colaborador / Solicitante *</label>
                 <input type="text" id="colaborador" required placeholder="Nombre del colaborador">
             </div>
 
-            <!-- Número de Extensión -->
             <div class="form-group">
                 <label>Número de Extensión *</label>
                 <input type="text" id="extension" required placeholder="Ej: 4022">
             </div>
 
-            <!-- Ubicación -->
             <div class="form-group">
                 <label>Ubicación *</label>
-                <input list="list-ubicaciones" id="ubicacion" placeholder="Escriba o seleccione..." required>
-                <datalist id="list-ubicaciones"></datalist>
+                <input id="ubicacion" placeholder="Escriba para buscar..." required>
             </div>
 
-            <!-- Dirección / Departamento -->
             <div class="form-group">
                 <label>Dirección / Departamento *</label>
-                <input list="list-departamentos" id="departamento" placeholder="Escriba o seleccione..." required>
-                <datalist id="list-departamentos"></datalist>
+                <input id="departamento" placeholder="Escriba para buscar..." required>
             </div>
 
-            <!-- Equipo Atendido -->
             <div class="form-group">
                 <label>Equipo Atendido *</label>
-                <input list="list-equipos" id="equipo" placeholder="Escriba o seleccione..." required>
-                <datalist id="list-equipos"></datalist>
+                <input id="equipo" placeholder="Escriba para buscar..." required>
             </div>
 
-            <!-- Nivel de Soporte -->
             <div class="form-group">
                 <label>Nivel de Soporte *</label>
-                <input list="list-niveles" id="nivel" placeholder="Escriba o seleccione..." required>
-                <datalist id="list-niveles"></datalist>
+                <input id="nivel" placeholder="Escriba para buscar..." required>
             </div>
 
-            <!-- Detalle Soporte -->
             <div class="form-group full-width">
                 <label>Detalle del Soporte / Avería *</label>
                 <input type="text" id="detalle_soporte" required placeholder="Descripción detallada del problema...">
             </div>
         </div>
 
-        <button type="submit" id="btn-submit" style="margin-top: 16px;">Registrar Ticket de Soporte</button>
+        <button type="submit" class="submit" id="btn-submit">Registrar Ticket de Soporte</button>
     </form>
 </div>
 
-<script>
-    const API = 'http://127.0.0.1:8000/api';
+<!-- Modal de mensajes -->
+<div id="app-modal" class="app-modal-overlay">
+    <div class="app-modal" id="app-modal-box">
+        <h3 id="app-modal-title"></h3>
+        <p id="app-modal-msg"></p>
+        <div class="app-modal-actions" id="app-modal-actions"></div>
+    </div>
+</div>
 
+<script>
+    // Base relativa: funciona tanto en sitio raíz como en aplicación virtual de IIS.
+    const BASE = window.location.pathname.replace(/\/(monitoreo|formulario)\/?$/, '');
+    const API = `${BASE}/api`;
+
+    // ---------- Combobox buscable reutilizable ----------
+    function makeCombo(input, options) {
+        input.setAttribute('autocomplete', 'off');
+        const list = document.createElement('div');
+        list.className = 'combo-list';
+        input.parentNode.appendChild(list);
+        let current = [];
+        let activeIndex = -1;
+
+        const escapeHtml = s => String(s).replace(/[&<>"']/g, c => (
+            { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+        function render() {
+            const f = (input.value || '').toLowerCase();
+            current = options.filter(o => o.toLowerCase().includes(f));
+            activeIndex = -1;
+            list.innerHTML = current.length
+                ? current.map((o, i) => `<div class="combo-item" data-i="${i}">${escapeHtml(o)}</div>`).join('')
+                : '<div class="combo-empty">Sin coincidencias</div>';
+            list.classList.add('open');
+        }
+        function close() { list.classList.remove('open'); activeIndex = -1; }
+        function choose(i) {
+            if (current[i] !== undefined) {
+                input.value = current[i];
+                close();
+                input.dispatchEvent(new Event('change'));
+            }
+        }
+
+        input.addEventListener('focus', render);
+        input.addEventListener('input', render);
+        input.addEventListener('blur', () => setTimeout(close, 150));
+        list.addEventListener('mousedown', e => {
+            const it = e.target.closest('.combo-item');
+            if (it) { e.preventDefault(); choose(parseInt(it.dataset.i, 10)); }
+        });
+        input.addEventListener('keydown', e => {
+            const items = Array.from(list.querySelectorAll('.combo-item'));
+            if (e.key === 'ArrowDown') { e.preventDefault(); if (!list.classList.contains('open')) render(); activeIndex = Math.min(activeIndex + 1, items.length - 1); }
+            else if (e.key === 'ArrowUp') { e.preventDefault(); activeIndex = Math.max(activeIndex - 1, 0); }
+            else if (e.key === 'Enter') { if (list.classList.contains('open') && activeIndex >= 0) { e.preventDefault(); choose(activeIndex); } return; }
+            else if (e.key === 'Escape') { close(); return; }
+            items.forEach((it, i) => it.classList.toggle('active', i === activeIndex));
+            if (items[activeIndex]) items[activeIndex].scrollIntoView({ block: 'nearest' });
+        });
+    }
+
+    // ---------- Modal de mensajes ----------
+    function showModal({ title, message, error = false, buttons }) {
+        document.getElementById('app-modal-title').textContent = title;
+        document.getElementById('app-modal-msg').textContent = message;
+        document.getElementById('app-modal-box').classList.toggle('error', error);
+        const actions = document.getElementById('app-modal-actions');
+        actions.innerHTML = '';
+        buttons.forEach(b => {
+            const btn = document.createElement('button');
+            btn.textContent = b.label;
+            btn.className = 'modal-btn' + (b.primary ? ' modal-btn-primary' : '');
+            btn.onclick = () => { document.getElementById('app-modal').classList.remove('show'); b.onClick && b.onClick(); };
+            actions.appendChild(btn);
+        });
+        document.getElementById('app-modal').classList.add('show');
+    }
+    function notify(message, title = 'Información', error = false) {
+        return new Promise(res => showModal({ title, message, error, buttons: [{ label: 'Aceptar', primary: true, onClick: res }] }));
+    }
+
+    // ---------- Carga de catálogos ----------
     async function cargarCatalogos() {
         try {
             const res = await fetch(`${API}/catalogos`);
             if (!res.ok) return;
             const data = await res.json();
 
-            const poblarDatalist = (id, lista) => {
-                const dl = document.getElementById(id);
-                if (dl && Array.isArray(lista)) {
-                    dl.innerHTML = lista.map(item => `<option value="${item}"></option>`).join('');
-                }
+            const wire = (id, lista) => {
+                const el = document.getElementById(id);
+                if (el && Array.isArray(lista)) makeCombo(el, lista);
             };
 
-            poblarDatalist('list-tecnicos', data.tecnicos);
-            poblarDatalist('list-tecnicos-comp', data.tecnicos);
-            poblarDatalist('list-ubicaciones', data.ubicaciones);
-            poblarDatalist('list-departamentos', data.departamentos);
-            poblarDatalist('list-equipos', data.equipos);
-            poblarDatalist('list-niveles', data.niveles);
+            wire('tecnico', data.tecnicos);
+            wire('tecnico_companero', data.tecnicos);
+            wire('ubicacion', data.ubicaciones);
+            wire('departamento', data.departamentos);
+            wire('equipo', data.equipos);
+            wire('nivel', data.niveles);
         } catch (error) {
             console.error('Error al cargar los catálogos:', error);
         }
     }
 
+    // ---------- Envío del formulario ----------
     document.getElementById('ticketForm').addEventListener('submit', async (e) => {
         e.preventDefault();
-        
+
         const btnSubmit = document.getElementById('btn-submit');
         btnSubmit.disabled = true;
-        btnSubmit.innerText = 'Guardando en BD...';
+        btnSubmit.textContent = 'Guardando...';
 
         const payload = {
             tecnico: document.getElementById('tecnico').value,
@@ -145,7 +237,7 @@
         try {
             const res = await fetch(`${API}/crear-ticket`, {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
 
@@ -153,16 +245,16 @@
                 const data = await res.json();
                 const ticketId = data.id_ticket || data.id || 'N/A';
                 const horaInicio = data.hora_inicio || 'Registrada';
-                alert(`✅ Ticket ${ticketId} registrado con éxito en la BD.\nHora de Inicio: ${horaInicio}`);
+                await notify(`El ticket ${ticketId} fue registrado correctamente.\nHora de inicio: ${horaInicio}`, 'Registro exitoso');
                 document.getElementById('ticketForm').reset();
             } else {
-                alert('⚠️ No se pudo registrar el ticket. Verifica los campos e intentalo de nuevo.');
+                await notify('No se pudo registrar el ticket. Verifique los campos e intente nuevamente.', 'Registro no completado', true);
             }
         } catch (error) {
-            alert('❌ Error de conexión con el backend SQLite/FastAPI.');
+            await notify('Error de conexión con el servidor. Intente nuevamente.', 'Sin conexión', true);
         } finally {
             btnSubmit.disabled = false;
-            btnSubmit.innerText = 'Registrar Ticket de Soporte';
+            btnSubmit.textContent = 'Registrar Ticket de Soporte';
         }
     });
 

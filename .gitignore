@@ -7,6 +7,15 @@ dist/
 __pycache__/
 *.pyc
 venv/
+.venv/
 
-# Base de datos local (Render manejará la suya)
+# Base de datos local y artefactos de SQLite (WAL)
 soporte.db
+*.db-shm
+*.db-wal
+
+# Temporales de Office (archivos de bloqueo ~$)
+~$*
+
+# Logs de IIS / HttpPlatformHandler
+logs/
